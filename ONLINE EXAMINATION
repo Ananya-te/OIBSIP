@@ -39,7 +39,7 @@ class Question {
 
 class Exam {
     private List<Question> questions;
-    private int timeLimit; // in minutes
+    private int timeLimit;
     private Map<User, List<Integer>> userAnswers;
 
     public Exam(int timeLimit) {
@@ -101,7 +101,6 @@ class ExamSystem {
 
     public void createExam(int timeLimit) {
         currentExam = new Exam(timeLimit);
-        // Add some sample questions
         currentExam.addQuestion(new Question("What is 2 + 2?", Arrays.asList("3", "4", "5", "6"), 1));
         currentExam.addQuestion(new Question("What is the capital of France?", Arrays.asList("London", "Berlin", "Paris", "Madrid"), 2));
     }
@@ -172,7 +171,7 @@ public class OnlineExamination {
                 System.out.println("2. Exit");
                 System.out.print("Choose an option: ");
                 int choice = scanner.nextInt();
-                scanner.nextLine(); // Consume newline
+                scanner.nextLine(); 
 
                 if (choice == 1) {
                     System.out.print("Username: ");
