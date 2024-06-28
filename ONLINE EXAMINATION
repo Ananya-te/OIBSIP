@@ -13,8 +13,6 @@ class User {
         this.password = password;
         this.profile = "";
     }
-
-    // Getters and setters
     public String getUsername() { return username; }
     public String getPassword() { return password; }
     public String getProfile() { return profile; }
@@ -72,7 +70,6 @@ class ExamSystem {
 
     public ExamSystem() {
         users = new HashMap<>();
-        // Add some sample users
         users.put("Sima", new User("Sima", "123"));
         users.put("Tom", new User("Tom", "456"));
     }
@@ -200,7 +197,7 @@ public class OnlineExamination {
                 System.out.println("4. Logout");
                 System.out.print("Choose an option: ");
                 int choice = scanner.nextInt();
-                scanner.nextLine(); // Consume newline
+                scanner.nextLine(); 
 
                 switch (choice) {
                     case 1:
@@ -214,7 +211,7 @@ public class OnlineExamination {
                         system.updatePassword(currentUser.getUsername(), newPassword);
                         break;
                     case 3:
-                        system.createExam(10); // Create a 10-minute exam
+                        system.createExam(10); 
                         system.startExam(currentUser);
                         break;
                     case 4:
