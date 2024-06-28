@@ -31,7 +31,7 @@ class Question {
         this.correctOption = correctOption;
     }
 
-    // Getters
+    
     public String getQuestionText() { return questionText; }
     public List<String> getOptions() { return options; }
     public int getCorrectOption() { return correctOption; }
