@@ -1,0 +1,322 @@
+# ONLINERESERVATIONSYSTEM
+
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+import java.util.Random;
+
+public class OnlineReservationSystem {
+    private JFrame mainFrame;
+    private JPanel currentPanel;
+    private Connection connection;
+    private int currentUserId = -1;
+
+    public OnlineReservationSystem() {
+        initializeDatabase();
+        createMainFrame();
+        showLoginForm();
+    }
+
+    private void initializeDatabase() {
+        try {
+            Class.forName("org.sqlite.JDBC");
+            connection = DriverManager.getConnection("jdbc:sqlite:reservation_system.db");
+            createTables();
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database connection failed: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private void createTables() {
+        try {
+            Statement stmt = connection.createStatement();
+            stmt.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS trains (id INTEGER PRIMARY KEY AUTOINCREMENT, train_number TEXT UNIQUE, train_name TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS reservations (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, train_number TEXT, class_type TEXT, journey_date TEXT, from_place TEXT, to_place TEXT, pnr TEXT UNIQUE)");
+          
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM trains");
+            if (rs.next() && rs.getInt(1) == 0) {
+                stmt.execute("INSERT INTO trains (train_number, train_name) VALUES ('12345', 'Express 1')");
+                stmt.execute("INSERT INTO trains (train_number, train_name) VALUES ('67890', 'Super Fast 2')");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error creating tables: " + e.getMessage());
+        }
+    }
+
+    private void createMainFrame() {
+        mainFrame = new JFrame("Online Reservation System");
+        mainFrame.setSize(400, 300);
+        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainFrame.setLayout(new BorderLayout());
+    }
+
+    private void showLoginForm() {
+        JPanel loginPanel = new JPanel(new GridLayout(3, 2));
+        JTextField usernameField = new JTextField();
+        JPasswordField passwordField = new JPasswordField();
+        JButton loginButton = new JButton("Login");
+        JButton registerButton = new JButton("Register");
+
+        loginPanel.add(new JLabel("Username:"));
+        loginPanel.add(usernameField);
+        loginPanel.add(new JLabel("Password:"));
+        loginPanel.add(passwordField);
+        loginPanel.add(loginButton);
+        loginPanel.add(registerButton);
+
+        loginButton.addActionListener(e -> {
+            String username = usernameField.getText();
+            String password = new String(passwordField.getPassword());
+            if (authenticateUser(username, password)) {
+                showMainMenu();
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Invalid credentials");
+            }
+        });
+
+        registerButton.addActionListener(e -> {
+            String username = usernameField.getText();
+            String password = new String(passwordField.getPassword());
+            if (registerUser(username, password)) {
+                JOptionPane.showMessageDialog(mainFrame, "Registration successful");
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Registration failed");
+            }
+        });
+
+        setCurrentPanel(loginPanel);
+    }
+
+    private boolean authenticateUser(String username, String password) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement("SELECT id FROM users WHERE username = ? AND password = ?");
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                currentUserId = rs.getInt("id");
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private boolean registerUser(String username, String password) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement("INSERT INTO users (username, password) VALUES (?, ?)");
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            pstmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void showMainMenu() {
+        JPanel menuPanel = new JPanel(new GridLayout(3, 1));
+        JButton reserveButton = new JButton("Make Reservation");
+        JButton cancelButton = new JButton("Cancel Reservation");
+        JButton logoutButton = new JButton("Logout");
+
+        menuPanel.add(reserveButton);
+        menuPanel.add(cancelButton);
+        menuPanel.add(logoutButton);
+
+        reserveButton.addActionListener(e -> showReservationForm());
+        cancelButton.addActionListener(e -> showCancellationForm());
+        logoutButton.addActionListener(e -> {
+            currentUserId = -1;
+            showLoginForm();
+        });
+
+        setCurrentPanel(menuPanel);
+    }
+
+    private void showReservationForm() {
+        JPanel reservationPanel = new JPanel(new GridLayout(7, 2));
+        JTextField trainNumberField = new JTextField();
+        JTextField trainNameField = new JTextField();
+        JTextField classTypeField = new JTextField();
+        JTextField journeyDateField = new JTextField();
+        JTextField fromPlaceField = new JTextField();
+        JTextField toPlaceField = new JTextField();
+        JButton submitButton = new JButton("Submit");
+        JButton backButton = new JButton("Back");
+
+        reservationPanel.add(new JLabel("Train Number:"));
+        reservationPanel.add(trainNumberField);
+        reservationPanel.add(new JLabel("Train Name:"));
+        reservationPanel.add(trainNameField);
+        reservationPanel.add(new JLabel("Class Type:"));
+        reservationPanel.add(classTypeField);
+        reservationPanel.add(new JLabel("Journey Date:"));
+        reservationPanel.add(journeyDateField);
+        reservationPanel.add(new JLabel("From:"));
+        reservationPanel.add(fromPlaceField);
+        reservationPanel.add(new JLabel("To:"));
+        reservationPanel.add(toPlaceField);
+        reservationPanel.add(submitButton);
+        reservationPanel.add(backButton);
+
+        trainNumberField.addFocusListener(new FocusAdapter() {
+            public void focusLost(FocusEvent e) {
+                String trainNumber = trainNumberField.getText();
+                String trainName = getTrainName(trainNumber);
+                trainNameField.setText(trainName);
+            }
+        });
+
+        submitButton.addActionListener(e -> {
+            String pnr = makeReservation(
+                trainNumberField.getText(),
+                classTypeField.getText(),
+                journeyDateField.getText(),
+                fromPlaceField.getText(),
+                toPlaceField.getText()
+            );
+            if (pnr != null) {
+                JOptionPane.showMessageDialog(mainFrame, "Reservation successful. PNR: " + pnr);
+                showMainMenu();
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Reservation failed");
+            }
+        });
+
+        backButton.addActionListener(e -> showMainMenu());
+
+        setCurrentPanel(reservationPanel);
+    }
+
+    private String getTrainName(String trainNumber) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement("SELECT train_name FROM trains WHERE train_number = ?");
+            pstmt.setString(1, trainNumber);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("train_name");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    private String makeReservation(String trainNumber, String classType, String journeyDate, String fromPlace, String toPlace) {
+        try {
+            String pnr = generatePNR();
+            PreparedStatement pstmt = connection.prepareStatement("INSERT INTO reservations (user_id, train_number, class_type, journey_date, from_place, to_place, pnr) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            pstmt.setInt(1, currentUserId);
+            pstmt.setString(2, trainNumber);
+            pstmt.setString(3, classType);
+            pstmt.setString(4, journeyDate);
+            pstmt.setString(5, fromPlace);
+            pstmt.setString(6, toPlace);
+            pstmt.setString(7, pnr);
+            pstmt.executeUpdate();
+            return pnr;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String generatePNR() {
+        return "PNR" + new Random().nextInt(1000000, 9999999);
+    }
+
+    private void showCancellationForm() {
+        JPanel cancellationPanel = new JPanel(new GridLayout(3, 2));
+        JTextField pnrField = new JTextField();
+        JButton submitButton = new JButton("Submit");
+        JButton backButton = new JButton("Back");
+
+        cancellationPanel.add(new JLabel("PNR Number:"));
+        cancellationPanel.add(pnrField);
+        cancellationPanel.add(submitButton);
+        cancellationPanel.add(backButton);
+
+        submitButton.addActionListener(e -> {
+            String pnr = pnrField.getText();
+            String reservationDetails = getReservationDetails(pnr);
+            if (reservationDetails != null) {
+                int choice = JOptionPane.showConfirmDialog(mainFrame, 
+                    reservationDetails + "\nDo you want to cancel this reservation?", 
+                    "Confirm Cancellation", 
+                    JOptionPane.YES_NO_OPTION);
+                if (choice == JOptionPane.YES_OPTION) {
+                    if (cancelReservation(pnr)) {
+                        JOptionPane.showMessageDialog(mainFrame, "Reservation cancelled successfully");
+                        showMainMenu();
+                    } else {
+                        JOptionPane.showMessageDialog(mainFrame, "Cancellation failed");
+                    }
+                }
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Invalid PNR");
+            }
+        });
+
+        backButton.addActionListener(e -> showMainMenu());
+
+        setCurrentPanel(cancellationPanel);
+    }
+
+    private String getReservationDetails(String pnr) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement("SELECT * FROM reservations WHERE pnr = ? AND user_id = ?");
+            pstmt.setString(1, pnr);
+            pstmt.setInt(2, currentUserId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return String.format("Train Number: %s\nClass: %s\nJourney Date: %s\nFrom: %s\nTo: %s",
+                    rs.getString("train_number"),
+                    rs.getString("class_type"),
+                    rs.getString("journey_date"),
+                    rs.getString("from_place"),
+                    rs.getString("to_place"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private boolean cancelReservation(String pnr) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement("DELETE FROM reservations WHERE pnr = ? AND user_id = ?");
+            pstmt.setString(1, pnr);
+            pstmt.setInt(2, currentUserId);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void setCurrentPanel(JPanel panel) {
+        if (currentPanel != null) {
+            mainFrame.remove(currentPanel);
+        }
+        currentPanel = panel;
+        mainFrame.add(currentPanel, BorderLayout.CENTER);
+        mainFrame.revalidate();
+        mainFrame.repaint();
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new OnlineReservationSystem().mainFrame.setVisible(true);
+        });
+    }
+}
